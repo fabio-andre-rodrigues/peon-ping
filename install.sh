@@ -93,6 +93,7 @@ if [ -n "$SCRIPT_DIR" ]; then
   cp "$SCRIPT_DIR/peon.sh" "$INSTALL_DIR/"
   cp "$SCRIPT_DIR/completions.bash" "$INSTALL_DIR/"
   cp "$SCRIPT_DIR/VERSION" "$INSTALL_DIR/"
+  cp "$SCRIPT_DIR/uninstall.sh" "$INSTALL_DIR/"
   if [ "$UPDATING" = false ]; then
     cp "$SCRIPT_DIR/config.json" "$INSTALL_DIR/"
   fi
