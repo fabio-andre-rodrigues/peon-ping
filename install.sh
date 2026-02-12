@@ -68,7 +68,7 @@ elif [ "$PLATFORM" = "wsl" ]; then
   fi
 elif [ "$PLATFORM" = "linux" ]; then
   LINUX_PLAYER=""
-  for cmd in paplay ffplay mpv aplay; do
+  for cmd in pw-play paplay ffplay mpv aplay; do
     if command -v "$cmd" &>/dev/null; then
       LINUX_PLAYER="$cmd"
       break
@@ -76,7 +76,7 @@ elif [ "$PLATFORM" = "linux" ]; then
   done
   if [ -z "$LINUX_PLAYER" ]; then
     echo "Error: no supported audio player found."
-    echo "Install one of: paplay (pulseaudio-utils), ffplay (ffmpeg), mpv, aplay (alsa-utils)"
+    echo "Install one of: pw-play (pipewire-audio) paplay (pulseaudio-utils), ffplay (ffmpeg), mpv, aplay (alsa-utils)"
     exit 1
   fi
   echo "Audio player: $LINUX_PLAYER"
@@ -295,7 +295,9 @@ if [ -n "$TEST_SOUND" ]; then
       \$p.Close()
     " 2>/dev/null
   elif [ "$PLATFORM" = "linux" ]; then
-    if command -v paplay &>/dev/null; then
+    if command -v pw-play &>/dev/null; then
+      pw-play --volume=0.3 "$TEST_SOUND" 2>/dev/null
+    elif command -v paplay &>/dev/null; then
       paplay --volume="$(python3 -c "print(int(0.3 * 65536))")" "$TEST_SOUND" 2>/dev/null
     elif command -v ffplay &>/dev/null; then
       ffplay -nodisp -autoexit -volume 30 "$TEST_SOUND" 2>/dev/null

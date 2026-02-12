@@ -113,7 +113,7 @@ bash ~/.claude/hooks/peon-ping/uninstall.sh
 
 ## Requirements
 
-- macOS (uses `afplay` and AppleScript), WSL2 (uses PowerShell `MediaPlayer` and WinForms), or Linux (uses `paplay`/`ffplay`/`mpv`/`aplay` and `notify-send`)
+- macOS (uses `afplay` and AppleScript), WSL2 (uses PowerShell `MediaPlayer` and WinForms), or Linux (uses `pw-play`/`paplay`/`ffplay`/`mpv`/`aplay` and `notify-send`)
 - Claude Code with hooks support
 - python3
 

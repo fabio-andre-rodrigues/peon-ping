@@ -47,7 +47,10 @@ play_sound() {
       ;;
     linux)
       # Try common Linux audio players in order of preference
-      if command -v paplay &>/dev/null; then
+      if command -v pw-play &>/dev/null; then
+        local pw_vol
+        nohup pw-play --volume="$vol" "$file" >/dev/null 2>&1 &
+      elif command -v paplay &>/dev/null; then
         local pa_vol
         pa_vol=$(python3 -c "print(int($vol * 65536))")
         nohup paplay --volume="$pa_vol" "$file" >/dev/null 2>&1 &
