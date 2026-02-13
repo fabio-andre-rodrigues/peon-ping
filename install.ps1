@@ -58,7 +58,7 @@ if ($Packs) {
     Write-Host "  Installing ALL $($packsToInstall.Count) packs..." -ForegroundColor Cyan
 } else {
     # Default: install a curated set of popular packs
-    $defaultPacks = @("peon", "peasant", "sc_battlecruiser", "sc_kerrigan", "ra2_soviet_engineer", "tf2_engineer", "glados")
+    $defaultPacks = @("peon", "peasant", "glados", "sc_kerrigan", "sc_battlecruiser", "ra2_kirov", "dota2_axe", "duke_nukem", "tf2_engineer", "hd2_helldiver")
     $packsToInstall = $registry.packs | Where-Object { $_.name -in $defaultPacks }
     Write-Host "  Installing $($packsToInstall.Count) packs (use -All for all $($registry.packs.Count))..." -ForegroundColor Cyan
 }
