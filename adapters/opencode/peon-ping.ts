@@ -96,6 +96,7 @@ interface PeonConfig {
   categories: Partial<Record<CESPCategory, boolean>>
   spam_threshold: number
   spam_window_seconds: number
+  session_start_cooldown_seconds: number
   pack_rotation: string[]
   packs_dir?: string
   debounce_ms: number
@@ -106,6 +107,7 @@ interface PeonConfig {
 interface PeonState {
   last_played: Partial<Record<CESPCategory, string>>
   session_packs: Record<string, string>
+  last_session_start_sound_time?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -172,6 +174,7 @@ const DEFAULT_CONFIG: PeonConfig = {
   },
   spam_threshold: 3,
   spam_window_seconds: 10,
+  session_start_cooldown_seconds: 30,
   pack_rotation: [],
   debounce_ms: 500,
 }
@@ -716,6 +719,11 @@ export const PeonPingPlugin: Plugin = async ({ directory }) => {
   const terminalNotifierPath = detectTerminalNotifier()
   const iconPath = resolveIconPath()
 
+  // --- Subagent filtering ---
+  // Track subagent session IDs so we can skip sounds for them.
+  // OpenCode sets parentID on Session objects for subagent (Task tool) sessions.
+  const subagentSessionIds = new Set<string>()
+
   // --- In-memory state for debouncing and spam detection ---
   const shouldDebounce = createDebounceChecker(config.debounce_ms, {
     "task.complete": 5000,
@@ -755,6 +763,21 @@ export const PeonPingPlugin: Plugin = async ({ directory }) => {
 
     // Debounce check
     if (shouldDebounce(category)) return
+
+    // Session start cooldown — only the first workspace greeting plays when many
+    // workspaces open simultaneously. Uses .state.json so it's shared across all
+    // plugin instances (each workspace spawns its own).
+    if (category === "session.start") {
+      const cooldownSecs = config.session_start_cooldown_seconds ?? 30
+      if (cooldownSecs > 0) {
+        const st = loadState()
+        const lastSS = st.last_session_start_sound_time ?? 0
+        const nowSecs = Date.now() / 1000
+        if (nowSecs - lastSS < cooldownSecs) return
+        st.last_session_start_sound_time = nowSecs
+        saveState(st)
+      }
+    }
 
     // Pick sound (needed for both playback and notification body)
     let pickedSound: CESPSound | null = null
@@ -814,12 +837,52 @@ export const PeonPingPlugin: Plugin = async ({ directory }) => {
     100,
   )
 
+  /**
+   * Check if a sessionID belongs to a subagent.
+   */
+  function isSubagent(sid: string | undefined): boolean {
+    return !!sid && subagentSessionIds.has(sid)
+  }
+
   // --- Return OpenCode event hooks ---
   return {
     event: async ({ event }) => {
       switch (event.type) {
-        // Task complete
+        // Track subagent sessions on creation.
+        // Sessions with parentID are subagents — skip sounds for them.
+        case "session.created": {
+          const info = (event as any).properties?.info
+          if (info?.parentID) {
+            subagentSessionIds.add(info.id)
+            break // Don't play session.start for subagents
+          }
+          await emitCESP("session.start", {
+            status: "ready",
+          })
+          break
+        }
+
+        // Also catch session.updated/deleted to maintain the set
+        case "session.updated": {
+          const info = (event as any).properties?.info
+          if (info?.parentID) {
+            subagentSessionIds.add(info.id)
+          }
+          break
+        }
+
+        case "session.deleted": {
+          const info = (event as any).properties?.info
+          if (info?.id) {
+            subagentSessionIds.delete(info.id)
+          }
+          break
+        }
+
+        // Task complete — skip for subagents
         case "session.idle": {
+          const sid = (event as any).properties?.sessionID
+          if (isSubagent(sid)) break
           await emitCESP("task.complete", {
             status: "done",
             marker: "\u25cf ",
@@ -829,8 +892,10 @@ export const PeonPingPlugin: Plugin = async ({ directory }) => {
           break
         }
 
-        // Task error
+        // Task error — skip for subagents
         case "session.error": {
+          const sid = (event as any).properties?.sessionID
+          if (isSubagent(sid)) break
           await emitCESP("task.error", {
             status: "error",
             marker: "\u25cf ",
@@ -851,18 +916,13 @@ export const PeonPingPlugin: Plugin = async ({ directory }) => {
           break
         }
 
-        // Session created
-        case "session.created": {
-          await emitCESP("session.start", {
-            status: "ready",
-          })
-          break
-        }
-
-        // Status change (working / busy)
+        // Status change (working / busy) — skip for subagents
         case "session.status": {
+          const sid = (event as any).properties?.sessionID
+          if (isSubagent(sid)) break
           const status = event.properties?.status
-          if (status === "busy" || status === "running") {
+          const statusType = typeof status === "object" ? (status as any)?.type : status
+          if (statusType === "busy" || statusType === "running") {
             // Check for spam first
             if (checkSpam()) {
               await emitCESP("user.spam", {

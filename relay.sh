@@ -178,6 +178,7 @@ import random
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.parse
 
 PEON_DIR = os.path.realpath(sys.argv[1])
@@ -225,11 +226,18 @@ def load_state():
 
 
 def save_state(state):
-    """Save .state.json."""
+    """Save .state.json atomically."""
     try:
-        os.makedirs(os.path.dirname(STATE_FILE) or ".", exist_ok=True)
-        with open(STATE_FILE, "w") as f:
-            json.dump(state, f)
+        d = os.path.dirname(STATE_FILE) or "."
+        os.makedirs(d, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(state, f)
+            os.replace(tmp, STATE_FILE)
+        except Exception:
+            try: os.unlink(tmp)
+            except OSError: pass
     except Exception:
         pass
 
@@ -293,6 +301,9 @@ def pick_sound_for_category(category):
     if not candidate.startswith(pack_root):
         return None, None
     if not os.path.isfile(candidate):
+        return None, None
+    _AUDIO_EXT = {'.wav', '.mp3', '.ogg', '.flac', '.aac', '.m4a', '.opus'}
+    if os.path.splitext(candidate)[1].lower() not in _AUDIO_EXT:
         return None, None
 
     return candidate, volume
@@ -359,13 +370,14 @@ def play_sound_on_host(path, volume):
             )
         else:
             # Fallback: inline PowerShell
-            vol_percent = max(0, min(100, int(float(vol) * 100)))
+            safe_path = win_path.replace("'", "''")
+            safe_vol = str(max(0.0, min(1.0, float(vol))))
             subprocess.Popen(
                 ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
                  f"Add-Type -AssemblyName PresentationCore; "
                  f"$mp = New-Object System.Windows.Media.MediaPlayer; "
-                 f"$mp.Volume = {vol}; "
-                 f"$mp.Open([uri]'{win_path}'); "
+                 f"$mp.Volume = {safe_vol}; "
+                 f"$mp.Open([uri]'{safe_path}'); "
                  f"$mp.Play(); "
                  f"Start-Sleep -Seconds 5"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -382,11 +394,12 @@ def send_notification_on_host(title, message, color="red"):
     notify_script = os.path.join(PEON_DIR, "scripts", "notify.sh")
     if os.path.isfile(notify_script):
         config = load_config()
-        notif_style = config.get("notification_style", "overlay")
         icon_path = os.path.join(PEON_DIR, "docs", "peon-icon.png")
         env = os.environ.copy()
         env["PEON_PLATFORM"] = HOST_PLATFORM
-        env["PEON_NOTIF_STYLE"] = notif_style
+        env["PEON_NOTIF_STYLE"] = config.get("notification_style", "overlay")
+        env["PEON_NOTIF_POSITION"] = config.get("notification_position", "top-center")
+        env["PEON_NOTIF_DISMISS"] = str(config.get("notification_dismiss_seconds", 4))
         env["PEON_DIR"] = PEON_DIR
         env["PEON_SYNC"] = os.environ.get("PEON_TEST", "0")
         subprocess.Popen(
@@ -468,6 +481,10 @@ class RelayHandler(http.server.BaseHTTPRequestHandler):
             return
         if not os.path.isfile(full_path):
             self.send_error(404, "File not found")
+            return
+        _AUDIO_EXT = {'.wav', '.mp3', '.ogg', '.flac', '.aac', '.m4a', '.opus'}
+        if os.path.splitext(full_path)[1].lower() not in _AUDIO_EXT:
+            self.send_error(403, "Forbidden: not an audio file")
             return
 
         vol = self.headers.get("X-Volume", "0.5")

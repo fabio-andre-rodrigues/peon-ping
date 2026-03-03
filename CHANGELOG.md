@@ -1,10 +1,41 @@
 # Changelog
 
-## v2.10.0 (2026-02-23)
+## v2.12.1 (2026-03-02)
+
+### Fixed
+- **mac-overlay cleanup** — orphaned `mac-overlay.js` osascript processes are now killed on `SessionEnd`, preventing stale overlay popups after Claude Code exits (#299, #301)
+- **Adapter cooldown bug** — `amp.sh` and `antigravity.sh` no longer prematurely mark threads idle during the Stop cooldown window, fixing dropped Stop events for rapid task completions (#300)
+
+## v2.12.0 (2026-02-27)
+
+### Added
+- **Windows PowerShell adapters** — native `.ps1` adapters for all 11 IDEs (codex, gemini, copilot, windsurf, kiro, openclaw, amp, antigravity, kimi, opencode, kilo). No Git Bash or WSL required. Filesystem watchers use .NET `FileSystemWatcher`. 198 Pester tests added. (#285)
+
+### Fixed
+- **OpenCode subagent noise** — filter subagent sessions from sound/notification events. Subagent sessions (spawned by Task tool with `parentID`) no longer trigger sounds for `session.idle`, `session.error`, and `session.status` events. (#290, fixes #289)
+
+
+## v2.11.0 (2026-02-26)
+
+### Added
+- **Kimi Code adapter** — filesystem watcher for [Kimi Code CLI](https://github.com/MoonshotAI/kimi-cli) (MoonshotAI). Watches `~/.kimi/sessions/` for session events and translates them to CESP format. Uses the same `fswatch`/`inotifywait` pattern as the Amp and Antigravity adapters. Includes BATS tests.
+
+## v2.10.1 (2026-02-25)
+
+### Fixed
+- Fix Ghostty terminal detection when running inside tmux: `_mac_terminal_bundle_id()` now falls back to env vars (`GHOSTTY_RESOURCES_DIR`, `ITERM_SESSION_ID`, `WARP_IS_LOCAL_SHELL_SESSION`) when `TERM_PROGRAM` is overwritten by tmux/screen (#269)
+- Fix case-sensitive Ghostty process name in `terminal_is_focused()`: add lowercase `ghostty` match alongside `Ghostty` (#269)
+
+## v2.13.0 (2026-03-03)
 
 ### Added
 - **Rovo Dev CLI adapter** (`adapters/rovodev.sh`) — translates Rovo Dev event hooks (`on_complete`, `on_error`, `on_tool_permission`) into CESP categories for peon-ping sound playback. Argument-based (not stdin), matching Rovo Dev's shell command hook model.
 - **Rovo Dev CLI auto-registration** — `install.sh` detects `~/.rovodev/config.yml` and automatically appends `eventHooks` configuration, so `peon-ping-setup` just works for Rovo Dev users.
+
+## v2.10.0 (2026-02-23)
+
+### Added
+- **Amp adapter** — filesystem watcher for [Amp](https://ampcode.com) (Sourcegraph). Watches `~/.local/share/amp/threads/` for thread JSON file changes. Detects `SessionStart` (new thread) and `Stop` (agent finished turn, waiting for input) by inspecting the last message in the thread JSON. Uses the same `fswatch`/`inotifywait` + idle timer pattern as the Antigravity adapter, with an additional `thread_is_waiting()` check to confirm the agent isn't mid-tool-execution. Includes 17 BATS tests.
 
 ## v2.9.0 (2026-02-21)
 
