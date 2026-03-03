@@ -104,7 +104,8 @@ JSON
     "user.spam": true
   },
   "annoyed_threshold": 3,
-  "annoyed_window_seconds": 10
+  "annoyed_window_seconds": 10,
+  "session_start_cooldown_seconds": 0
 }
 JSON
 
@@ -144,6 +145,69 @@ echo "$@" >> "${CLAUDE_PEON_DIR}/terminal_notifier.log"
 SCRIPT
   chmod +x "$MOCK_BIN/terminal-notifier"
 
+  # Mock system_profiler — returns audio device info for headphone detection
+  cat > "$MOCK_BIN/system_profiler" <<'SCRIPT'
+#!/bin/bash
+# Check for mock fixture files
+if [ -f "${CLAUDE_PEON_DIR}/.mock_headphones_connected" ]; then
+  cat <<'EOF'
+Audio:
+
+    Devices:
+
+        External Headphones:
+
+          Default Output Device: Yes
+          Input Channels: 0
+          Manufacturer: Apple Inc.
+          Output Channels: 2
+          Transport: USB
+
+        MacBook Pro Speakers:
+
+          Default Output Device: No
+          Input Channels: 0
+          Manufacturer: Apple Inc.
+          Output Channels: 2
+          Transport: Built-in
+
+EOF
+elif [ -f "${CLAUDE_PEON_DIR}/.mock_speakers_only" ]; then
+  cat <<'EOF'
+Audio:
+
+    Devices:
+
+        MacBook Pro Speakers:
+
+          Default Output Device: Yes
+          Default System Output Device: Yes
+          Input Channels: 0
+          Manufacturer: Apple Inc.
+          Output Channels: 2
+          Transport: Built-in
+
+EOF
+else
+  # Default: headphones connected (same as .mock_headphones_connected)
+  cat <<'EOF'
+Audio:
+
+    Devices:
+
+        External Headphones:
+
+          Default Output Device: Yes
+          Input Channels: 0
+          Manufacturer: Apple Inc.
+          Output Channels: 2
+          Transport: USB
+
+EOF
+fi
+SCRIPT
+  chmod +x "$MOCK_BIN/system_profiler"
+
   # Mock lsappinfo — returns a bundle ID for a given PID (IDE click-to-focus)
   cat > "$MOCK_BIN/lsappinfo" <<'SCRIPT'
 #!/bin/bash
@@ -169,9 +233,18 @@ SCRIPT
   # Mock osascript — log calls instead of running AppleScript/JXA
   cat > "$MOCK_BIN/osascript" <<'SCRIPT'
 #!/bin/bash
-# For the frontmost app check, return "Safari" (not a terminal) so notifications fire
+# For the frontmost app check, return terminal name or "Safari" based on fixture
 if [[ "$*" == *"frontmost"* ]]; then
-  echo "Safari"
+  if [ -f "${CLAUDE_PEON_DIR}/.mock_terminal_focused" ]; then
+    cat "${CLAUDE_PEON_DIR}/.mock_terminal_focused"
+  else
+    echo "Safari"
+  fi
+elif [[ "$*" == *"iTerm2"* ]] && [[ "$*" == *"tty"* ]]; then
+  # iTerm2 tty query — return mock tty if fixture exists
+  if [ -f "${CLAUDE_PEON_DIR}/.mock_iterm_active_ttys" ]; then
+    cat "${CLAUDE_PEON_DIR}/.mock_iterm_active_ttys"
+  fi
 elif [[ "$1" == "-l" ]] && [[ "$2" == "JavaScript" ]]; then
   # JXA overlay call — log to overlay.log with full arguments
   echo "$@" >> "${CLAUDE_PEON_DIR}/overlay.log"
@@ -275,6 +348,18 @@ SCRIPT
   chmod +x "$MOCK_BIN/curl"
 
   export PATH="$MOCK_BIN:$PATH"
+
+  # Mock meeting-detect binary — returns MIC_IN_USE or MIC_NOT_IN_USE based on fixture
+  mkdir -p "$TEST_DIR/scripts"
+  cat > "$TEST_DIR/scripts/meeting-detect" <<'SCRIPT'
+#!/bin/bash
+if [ -f "${CLAUDE_PEON_DIR}/.mock_mic_in_use" ]; then
+  echo "MIC_IN_USE"
+else
+  echo "MIC_NOT_IN_USE"
+fi
+SCRIPT
+  chmod +x "$TEST_DIR/scripts/meeting-detect"
 
   # Copy notify.sh into test dir so send_notification() can find it
   _src_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

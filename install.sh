@@ -395,6 +395,7 @@ else
   curl -fsSL "$REPO_BASE/adapters/opencode.sh" -o "$INSTALL_DIR/adapters/opencode.sh" 2>/dev/null || true
   curl -fsSL "$REPO_BASE/adapters/windsurf.sh" -o "$INSTALL_DIR/adapters/windsurf.sh" 2>/dev/null || true
   curl -fsSL "$REPO_BASE/adapters/rovodev.sh" -o "$INSTALL_DIR/adapters/rovodev.sh" 2>/dev/null || true
+  curl -fsSL "$REPO_BASE/adapters/kimi.sh" -o "$INSTALL_DIR/adapters/kimi.sh" 2>/dev/null || true
   mkdir -p "$INSTALL_DIR/scripts"
   curl -fsSL "$REPO_BASE/scripts/hook-handle-use.sh" -o "$INSTALL_DIR/scripts/hook-handle-use.sh" 2>/dev/null || true
   curl -fsSL "$REPO_BASE/scripts/hook-handle-use.ps1" -o "$INSTALL_DIR/scripts/hook-handle-use.ps1" 2>/dev/null || true
@@ -494,6 +495,22 @@ if [ "$PLATFORM" = "mac" ] && command -v swiftc &>/dev/null; then
       -framework AVFoundation -framework CoreAudio -framework AudioToolbox 2>/dev/null \
       && echo "  peon-play built successfully" \
       || echo "  Warning: could not build peon-play, using afplay fallback"
+  fi
+fi
+
+# --- Build meeting-detect (macOS mic-in-use detection) ---
+if [ "$PLATFORM" = "mac" ] && command -v swiftc &>/dev/null; then
+  MEETING_DETECT_SRC="$INSTALL_DIR/scripts/meeting-detect.swift"
+  if [ ! -f "$MEETING_DETECT_SRC" ] && [ -z "$SCRIPT_DIR" ]; then
+    curl -fsSL "$REPO_BASE/scripts/meeting-detect.swift" -o "$MEETING_DETECT_SRC" 2>/dev/null || true
+  fi
+  if [ -f "$MEETING_DETECT_SRC" ]; then
+    echo "Building meeting-detect (mic-in-use detection)..."
+    swiftc -O -o "$INSTALL_DIR/scripts/meeting-detect" \
+      "$MEETING_DETECT_SRC" \
+      -framework CoreAudio 2>/dev/null \
+      && echo "  meeting-detect built successfully" \
+      || echo "  Warning: could not build meeting-detect, using process-based fallback"
   fi
 fi
 
@@ -1134,6 +1151,13 @@ ROVOEOF
 
   echo "Rovo Dev CLI event hooks created at $ROVODEV_CONFIG"
   echo "Restart Rovo Dev CLI for hooks to take effect."
+
+# --- Auto-detect Kimi Code CLI and start watcher daemon ---
+KIMI_DIR="$HOME/.kimi"
+if [ -d "$KIMI_DIR" ]; then
+  echo ""
+  echo "Detected Kimi Code CLI installation, starting adapter..."
+  bash "$INSTALL_DIR/adapters/kimi.sh" --install
 fi
 
 # --- Remove peon-ping hooks from project-level settings to prevent doubles ---
