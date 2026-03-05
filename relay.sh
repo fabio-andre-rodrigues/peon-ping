@@ -179,6 +179,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.parse
 
 PEON_DIR = os.path.realpath(sys.argv[1])
@@ -536,7 +537,19 @@ class RelayHandler(http.server.BaseHTTPRequestHandler):
                     state = json.load(f)
             except (FileNotFoundError, json.JSONDecodeError):
                 pass
-            state["last_active"] = last_active
+            session_id = last_active.get("session_id", "")
+            if not session_id:
+                self.send_error(400, "Missing session_id in last_active")
+                return
+            sessions = state.get("sessions", {})
+            if last_active.get("event") == "SessionEnd":
+                sessions.pop(session_id, None)
+            else:
+                sessions[session_id] = last_active
+            # Prune sessions inactive for more than 10 min
+            now = time.time()
+            sessions = {sid: s for sid, s in sessions.items() if now - s.get("timestamp", 0) < 600}
+            state["sessions"] = sessions
             tmp = REMOTE_STATE_FILE + ".tmp"
             with open(tmp, "w") as f:
                 json.dump(state, f)
