@@ -704,22 +704,44 @@ if ($Command) {
                         return
                     }
                     $packs = $reg.packs
-                    Write-Host "Registry packs ($($packs.Count) available):" -ForegroundColor Cyan
+                    Write-Host ""
+                    Write-Host "  Registry packs ($($packs.Count) available)" -ForegroundColor Cyan
+                    Write-Host ""
                     $grouped = @{}
                     foreach ($p in $packs) {
                         $tier = if ($p.trust_tier) { $p.trust_tier } else { "unknown" }
                         if (-not $grouped.ContainsKey($tier)) { $grouped[$tier] = @() }
                         $grouped[$tier] += $p
                     }
+                    $maxName = ($packs | ForEach-Object { $_.name.Length } | Measure-Object -Maximum).Maximum
+                    $nameWidth = [Math]::Max($maxName + 2, 24)
                     # Show official first, then community, then others
                     $tierOrder = @("official") + @($grouped.Keys | Where-Object { $_ -ne "official" } | Sort-Object)
                     foreach ($tier in $tierOrder) {
                         if (-not $grouped.ContainsKey($tier)) { continue }
-                        foreach ($p in ($grouped[$tier] | Sort-Object { $_.name })) {
-                            $installedTag = if ($p.name -in $available) { "[installed] " } else { "            " }
-                            $soundCount = if ($p.sound_count) { $p.sound_count } else { "?" }
-                            Write-Host "  $installedTag$($p.name) ($soundCount sounds) -- $tier"
+                        $tierPacks = @($grouped[$tier] | Sort-Object { $_.name })
+                        $tierLabel = (Get-Culture).TextInfo.ToTitleCase($tier)
+                        $installedInTier = @($tierPacks | Where-Object { $_.name -in $available }).Count
+                        $tierInfo = "$($tierPacks.Count) packs"
+                        if ($installedInTier -gt 0) { $tierInfo += ", $installedInTier installed" }
+                        Write-Host "  --- $tierLabel ($tierInfo) ---" -ForegroundColor DarkGray
+                        foreach ($p in $tierPacks) {
+                            $isInstalled = $p.name -in $available
+                            $soundStr = if ($p.sound_count) { "$($p.sound_count)".PadLeft(4) } else { "   ?" }
+                            $displayName = if ($p.display_name) { $p.display_name } else { "" }
+                            if ($isInstalled) {
+                                Write-Host "  $([char]0x2713) " -NoNewline -ForegroundColor Green
+                            } else {
+                                Write-Host "    " -NoNewline
+                            }
+                            Write-Host ($p.name.PadRight($nameWidth)) -NoNewline -ForegroundColor White
+                            Write-Host "$soundStr sounds" -NoNewline -ForegroundColor DarkGray
+                            if ($displayName) {
+                                Write-Host "   $displayName" -NoNewline -ForegroundColor DarkGray
+                            }
+                            Write-Host ""
                         }
+                        Write-Host ""
                     }
                     return
                 }
@@ -742,11 +764,28 @@ if ($Command) {
                         Write-Host "No packs matching '$Arg2'." -ForegroundColor Yellow
                         return
                     }
+                    Write-Host ""
+                    Write-Host "  Search results for '$Arg2' ($($matches.Count) found)" -ForegroundColor Cyan
+                    Write-Host ""
+                    $maxName = ($matches | ForEach-Object { $_.name.Length } | Measure-Object -Maximum).Maximum
+                    $nameWidth = [Math]::Max($maxName + 2, 24)
                     foreach ($p in ($matches | Sort-Object { $_.name })) {
-                        $installedTag = if ($p.name -in $available) { "[installed] " } else { "            " }
+                        $isInstalled = $p.name -in $available
                         $tier = if ($p.trust_tier) { $p.trust_tier } else { "unknown" }
-                        $soundCount = if ($p.sound_count) { $p.sound_count } else { "?" }
-                        Write-Host "  $installedTag$($p.name) ($soundCount sounds) -- $tier"
+                        $soundStr = if ($p.sound_count) { "$($p.sound_count)".PadLeft(4) } else { "   ?" }
+                        $displayName = if ($p.display_name) { $p.display_name } else { "" }
+                        if ($isInstalled) {
+                            Write-Host "  $([char]0x2713) " -NoNewline -ForegroundColor Green
+                        } else {
+                            Write-Host "    " -NoNewline
+                        }
+                        Write-Host ($p.name.PadRight($nameWidth)) -NoNewline -ForegroundColor White
+                        Write-Host "$soundStr sounds" -NoNewline -ForegroundColor DarkGray
+                        if ($displayName) {
+                            Write-Host "   $displayName" -NoNewline -ForegroundColor DarkGray
+                        }
+                        Write-Host "  " -NoNewline
+                        Write-Host "[$tier]" -ForegroundColor DarkGray
                     }
                     return
                 }
