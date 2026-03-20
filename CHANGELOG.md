@@ -1,3 +1,9 @@
+## v2.16.1 (2026-03-20)
+
+### Fixed
+- **macOS persistent overlay (`dismiss=0`) killed by watchdog** — the shell-level safety watchdog in `notify.sh` computed `_max_wait = 0 + 5 = 5s`, killing the JXA overlay process 5 seconds after spawn even when the user had configured persistent notifications via `peon notifications dismiss 0`. Persistent mode now sets `_max_wait=86400` (24 h) so the overlay stays until clicked. (#344)
+- **Linux `urgency=critical` overrides dismiss time** — `notify-send --urgency=critical` (used for red/error sounds) caused notification daemons like `dunst` and `mako` to ignore `--expire-time`, pinning the notification until manually dismissed regardless of `notification_dismiss_seconds`. Changed to always use `urgency=normal`; error sounds are already visually distinct via title/color. (#378)
+
 ## v2.16.0 (2026-03-20)
 
 ### Added
