@@ -1408,7 +1408,7 @@ Describe "install.ps1 Default Config" {
     }
 
     It "help text has aligned columns and pack management section" {
-        $script:installContent | Should -Match '--packs use <n>'
+        $script:installContent | Should -Match '--packs use <name>'
         $script:installContent | Should -Match '--packs next'
         $script:installContent | Should -Match 'Pack management:'
     }
