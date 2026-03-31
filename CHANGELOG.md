@@ -1,3 +1,9 @@
+## v2.17.3 (2026-03-31)
+
+### Fixed
+- **_peon_log: command not found on peon preview** — added a no-op stub for `_peon_log` before `play_sound` is called. The function was only defined inside the main Python block but called unconditionally by `play_sound`, causing `peon preview` and `peon play` to emit a shell error. Fixes #421.
+
+
 ## v2.17.2 (2026-03-29)
 
 ### Fixed
